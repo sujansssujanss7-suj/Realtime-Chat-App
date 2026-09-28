@@ -1,0 +1,24 @@
+# Normalize line endings to LF in the repository for all text files.
+# This prevents LF/CRLF warnings on Windows and ensures Render (Linux) works correctly.
+* text=auto eol=lf
+
+# Force LF for specific file types
+*.js    text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.json  text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.md    text eol=lf
+*.env*  text eol=lf
+
+# Binary files — do not touch line endings
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary

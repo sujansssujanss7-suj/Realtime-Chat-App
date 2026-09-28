@@ -1,0 +1,36 @@
+# render.yaml — Render Infrastructure-as-Code
+# Docs: https://render.com/docs/render-yaml
+#
+# Usage:
+#   1. Push this file to the ROOT of your repository (alongside /backend and /frontend).
+#   2. In Render dashboard → New → Blueprint → connect your repo.
+#   3. Render will auto-detect this file and create the service.
+#
+# Alternatively, create the Web Service manually using the settings below
+# under "Manual Render Dashboard Settings".
+
+services:
+  - type: web
+    name: realtime-chat-backend
+    runtime: node
+    # Path to the backend folder inside your monorepo
+    rootDir: backend
+    # Build command — installs production dependencies only
+    buildCommand: npm install --omit=dev
+    # Start command — uses the "start" script in backend/package.json
+    startCommand: npm start
+    # Render's free tier; upgrade to "starter" for always-on
+    plan: free
+    # Required: let Render know this is a long-running WebSocket server
+    # Render supports WebSockets natively on all plans
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # PORT is injected automatically by Render — do NOT set it here.
+      # MONGO_URI and CLIENT_URL must be set in the Render dashboard as secrets.
+      - key: MONGO_URI
+        sync: false        # Marks this as a secret — set in Render dashboard
+      - key: CLIENT_URL
+        sync: false        # Set to * for mobile app, or your web frontend URL
+    healthCheckPath: /api/health
