@@ -1,236 +1,273 @@
-# 💬 Real-Time Chat Application
+# Realtime Chat Application
 
-A production-quality real-time chat application built with **React Native (Expo)**, **Node.js**, **Express**, **Socket.io**, and **MongoDB**.
+A real-time mobile chat application built with React Native (Expo), Node.js, Express, Socket.io, and MongoDB Atlas. Messages are delivered instantly across devices via WebSocket and persisted in a cloud database.
 
----
-
-## 📋 Overview
-
-This application allows multiple users to connect, send and receive messages instantly using Socket.io WebSockets, and view persistent chat history stored in MongoDB. No page refreshes are needed — messages appear in real time for all connected clients.
+**Production Backend:** https://realtime-chat-app-jhnx.onrender.com
 
 ---
 
-## ✨ Features
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Features](#2-features)
+3. [Architecture](#3-architecture)
+4. [Tech Stack](#4-tech-stack)
+5. [Project Structure](#5-project-structure)
+6. [Backend Setup](#6-backend-setup)
+7. [Frontend Setup](#7-frontend-setup)
+8. [REST API Documentation](#8-rest-api-documentation)
+9. [Socket.io Events](#9-socketio-events)
+10. [Database](#10-database)
+11. [Error Handling and Validation](#11-error-handling-and-validation)
+12. [Deployment](#12-deployment)
+13. [Testing](#13-testing)
+14. [Design Decisions](#14-design-decisions)
+15. [Environment Variables](#15-environment-variables)
+16. [Future Improvements](#16-future-improvements)
+17. [Author](#17-author)
+
+---
+
+## 1. Overview
+
+This is a real-time mobile chat application that allows multiple users on separate devices to exchange messages instantly. Users enter a username to join a shared chat room — no account or registration required.
+
+Key capabilities:
+- **Instant messaging** via Socket.io WebSocket connections
+- **Persistent chat history** stored in MongoDB Atlas and loaded on entry
+- **REST API** for fetching and creating messages independently of the socket layer
+- **Typing indicators** and **online user count** displayed in real time
+- **Message delivery and read receipts** tracked per message
+- **Graceful connection handling** including reconnection logic and disconnect notifications
+
+---
+
+## 2. Features
 
 | Feature | Status |
 |---|---|
-| Username login (dummy auth) | ✅ |
-| Real-time messaging via Socket.io | ✅ |
-| Persistent message history (MongoDB) | ✅ |
-| Message timestamps | ✅ |
-| Typing indicator | ✅ |
-| Online/offline connection status | ✅ |
-| Online user count | ✅ |
-| Message delivery & read receipts | ✅ |
-| User join/leave notifications | ✅ |
-| Empty / loading / error states | ✅ |
-| Input validation (frontend + backend) | ✅ |
-| Character limit (500 chars) | ✅ |
-| Keyboard-safe layout | ✅ |
-| Centralized error handling | ✅ |
+| Real-time messaging via Socket.io | ✅ Implemented |
+| Multi-device / two-user communication | ✅ Implemented |
+| Persistent chat history (MongoDB) | ✅ Implemented |
+| Chat history loaded on screen entry | ✅ Implemented |
+| Username-based chat (no account needed) | ✅ Implemented |
+| Message timestamps (`createdAt`) | ✅ Implemented |
+| Delivered / read status per message | ✅ Implemented |
+| Typing indicators | ✅ Implemented |
+| Online user count | ✅ Implemented |
+| User join / leave notifications | ✅ Implemented |
+| REST API (GET & POST messages) | ✅ Implemented |
+| Input validation (client + server) | ✅ Implemented |
+| Centralized error handling | ✅ Implemented |
+| Socket reconnection logic | ✅ Implemented |
+| Graceful server shutdown (SIGTERM) | ✅ Implemented |
+| User authentication / login | ❌ Not implemented |
 
 ---
 
-## 🛠️ Technology Stack
+## 3. Architecture
 
-| Layer | Technology |
-|---|---|
-| Mobile Frontend | React Native + Expo |
-| Language | TypeScript |
-| Navigation | Expo Router |
-| HTTP Client | Axios |
-| Real-time | Socket.io (client) |
-| Backend Runtime | Node.js |
-| Web Framework | Express.js |
-| Real-time Server | Socket.io (server) |
-| Database | MongoDB + Mongoose |
-| Environment | dotenv |
+```
+┌──────────────────────────────────┐
+│   Mobile App (React Native Expo) │
+│                                  │
+│  • Username entry screen         │
+│  • Chat screen                   │
+│  • components/  services/        │
+└───────────┬──────────────────────┘
+            │
+            │  REST API (HTTP/HTTPS)   → GET /api/messages
+            │                          → POST /api/messages
+            │  Socket.io (WSS)         → sendMessage, typing, messageRead …
+            ▼
+┌──────────────────────────────────┐
+│  Node.js + Express + Socket.io   │
+│  (Deployed on Render)            │
+│                                  │
+│  • Express routes  /api/*        │
+│  • Socket.io event handlers      │
+│  • CORS + JSON middleware        │
+│  • Centralized error handler     │
+└───────────┬──────────────────────┘
+            │  Mongoose ODM
+            ▼
+┌──────────────────────────────────┐
+│  MongoDB Atlas (Cloud Database)  │
+│                                  │
+│  • messages collection           │
+│  • Persists all chat messages    │
+└──────────────────────────────────┘
+```
+
+**Layer responsibilities:**
+
+- **Mobile App** — Renders the UI, manages socket lifecycle, calls the REST API for history, emits and listens for socket events.
+- **Node.js / Express / Socket.io** — Handles HTTP routes, validates requests, saves messages via Mongoose, broadcasts events to all connected clients.
+- **MongoDB Atlas** — Stores all messages durably. Messages survive server restarts and are returned on reconnection.
 
 ---
 
-## 📁 Project Structure
+## 4. Tech Stack
 
-```
-realtime-chat-app/
-├── frontend/
-│   ├── app/
-│   │   ├── _layout.tsx        # Root layout (Expo Router)
-│   │   ├── index.tsx          # Login / Username screen
-│   │   └── chat.tsx           # Main chat screen
-│   ├── components/
-│   │   ├── MessageBubble.tsx  # Individual chat message
-│   │   ├── ChatInput.tsx      # Message input + send button
-│   │   ├── TypingIndicator.tsx # Animated typing dots
-│   │   └── OnlineStatus.tsx   # Connection status badge
-│   ├── services/
-│   │   ├── api.ts             # Axios REST API service
-│   │   └── socket.ts          # Socket.io client service
-│   ├── constants/
-│   │   └── config.ts          # App-wide configuration
-│   ├── types/
-│   │   └── chat.ts            # TypeScript interfaces
-│   ├── package.json
-│   ├── app.json
-│   ├── tsconfig.json
-│   └── babel.config.js
-│
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   └── db.js          # MongoDB connection
-│   │   ├── controllers/
-│   │   │   └── messageController.js
-│   │   ├── models/
-│   │   │   └── Message.js     # Mongoose schema
-│   │   ├── routes/
-│   │   │   └── messageRoutes.js
-│   │   ├── sockets/
-│   │   │   └── chatSocket.js  # Socket.io event handlers
-│   │   ├── middleware/
-│   │   │   └── errorHandler.js
-│   │   └── server.js          # Entry point
-│   ├── package.json
-│   └── .env.example
-│
-├── .gitignore
-└── README.md
-```
-
----
-
-## ⚙️ Prerequisites
-
-- **Node.js** v18 or later
-- **npm** v9 or later
-- **MongoDB Atlas** account (free tier) or local MongoDB
-- **Expo Go** app on your Android/iOS device, OR Android Emulator
-
----
-
-## 🚀 Installation
-
-### 1. Clone / Download the project
-
-```bash
-git clone <your-repo-url>
-cd realtime-chat-app
-```
-
----
-
-### 2. Backend Setup
-
-```bash
-cd backend
-npm install
-```
-
-Create the `.env` file (copy from example):
-
-```bash
-copy .env.example .env
-```
-
-Edit `.env` and set your values:
-
-```env
-PORT=5000
-MONGO_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/realtime-chat?retryWrites=true&w=majority
-CLIENT_URL=http://localhost:8081
-NODE_ENV=development
-```
-
-Start the backend:
-
-```bash
-npm run dev
-```
-
-You should see:
-
-```
-🚀 Server running at http://localhost:5000
-✅ MongoDB Connected: cluster0.xxxxx.mongodb.net
-```
-
----
-
-### 3. Frontend Setup
-
-```bash
-cd frontend
-npm install
-```
-
-> **Android Emulator note:** In `frontend/constants/config.ts`, change `localhost` to `10.0.2.2` for the Android Emulator to reach your local backend:
->
-> ```ts
-> export const API_BASE_URL = 'http://10.0.2.2:5000';
-> export const SOCKET_URL = 'http://10.0.2.2:5000';
-> ```
->
-> **Physical Device note:** Use your machine's local IP (e.g. `192.168.1.x`).
-
-Start the Expo dev server:
-
-```bash
-npx expo start
-```
-
-Scan the QR code with **Expo Go** (Android/iOS) or press `a` for Android Emulator.
-
----
-
-## 🔐 Environment Variables
-
-| Variable | Description | Example |
+| Layer | Technology | Version |
 |---|---|---|
-| `PORT` | Backend server port | `5000` |
-| `MONGO_URI` | MongoDB connection string | `mongodb+srv://...` |
-| `CLIENT_URL` | Allowed CORS origin | `http://localhost:8081` |
-| `NODE_ENV` | Environment mode | `development` |
-
-> ⚠️ **Never commit your `.env` file.** It is listed in `.gitignore`.
-
----
-
-## 🍃 MongoDB Setup
-
-1. Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) and create a free account.
-2. Create a new **free cluster** (M0 tier).
-3. Go to **Database Access** → Create a database user with a username and password.
-4. Go to **Network Access** → Add `0.0.0.0/0` (allow all IPs) for development.
-5. Go to your cluster → Click **Connect** → **Connect your application**.
-6. Copy the connection string and replace `<username>`, `<password>`, and set the database name to `realtime-chat`.
-7. Paste into your `.env` as `MONGO_URI`.
+| **Frontend** | React Native + Expo | Expo SDK 57 |
+| **Frontend language** | TypeScript | ~6.0.3 |
+| **Frontend routing** | expo-router | ~57.0.23 |
+| **HTTP client** | Axios | ^1.7.0 |
+| **Backend** | Node.js + Express | Express ^4.18.2 |
+| **Real-time** | Socket.io | ^4.7.5 (server + client) |
+| **Database** | MongoDB Atlas | Cloud-hosted |
+| **ODM** | Mongoose | ^8.2.4 |
+| **CORS** | cors | ^2.8.5 |
+| **Environment** | dotenv | ^16.4.5 |
+| **Dev server** | nodemon | ^3.1.0 |
+| **Deployment** | Render | Free tier web service |
 
 ---
 
-## ▶️ Running the Application
+## 5. Project Structure
 
-### Terminal 1 — Backend
+```
+Realtime-Chat-App/
+├── render.yaml                    # Render infrastructure-as-code (deployment config)
+├── .gitignore
+├── backend/
+│   ├── package.json
+│   ├── .env.example               # Environment variable template (safe to commit)
+│   └── src/
+│       ├── server.js              # Express app, Socket.io setup, server entry point
+│       ├── config/
+│       │   └── db.js              # MongoDB Atlas connection via Mongoose
+│       ├── controllers/
+│       │   └── messageController.js  # getMessages, createMessage, healthCheck
+│       ├── middleware/
+│       │   └── errorHandler.js    # Centralized Express error handler
+│       ├── models/
+│       │   └── Message.js         # Mongoose Message schema
+│       ├── routes/
+│       │   └── messageRoutes.js   # Express router — /api/health, /api/messages
+│       └── sockets/
+│           └── chatSocket.js      # All Socket.io event logic
+└── frontend/
+    ├── app.json                   # Expo configuration (includes BACKEND_URL)
+    ├── package.json
+    ├── tsconfig.json
+    ├── babel.config.js
+    ├── app/
+    │   ├── _layout.tsx            # Expo Router root layout
+    │   ├── index.tsx              # Username entry screen
+    │   └── chat.tsx               # Main chat screen
+    ├── components/
+    │   ├── ChatInput.tsx          # Message text input with send button
+    │   ├── MessageBubble.tsx      # Individual message bubble (sent/received)
+    │   ├── OnlineStatus.tsx       # Connection status + online user count
+    │   └── TypingIndicator.tsx    # Animated typing indicator
+    ├── constants/
+    │   └── config.ts              # BACKEND_URL resolution, app-wide constants
+    ├── services/
+    │   ├── api.ts                 # Axios REST API service (fetchMessages, postMessage)
+    │   └── socket.ts              # Socket.io client — connect, emit, listen
+    └── types/
+        └── chat.ts                # TypeScript interfaces for all data shapes
+```
+
+---
+
+## 6. Backend Setup
+
+### Prerequisites
+
+- Node.js ≥ 18.0.0
+- A [MongoDB Atlas](https://www.mongodb.com/atlas) cluster with a connection string
+
+### Install dependencies
 
 ```bash
 cd backend
+npm install
+```
+
+### Environment variables
+
+Copy the example file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set the following variables (do **not** commit this file):
+
+```
+PORT=
+MONGO_URI=
+CLIENT_URL=
+NODE_ENV=
+```
+
+> See [Section 15 — Environment Variables](#15-environment-variables) for a description of each variable.
+
+### Start the backend
+
+**Development** (auto-restarts on file changes via nodemon):
+
+```bash
 npm run dev
 ```
 
-### Terminal 2 — Frontend
+**Production:**
 
 ```bash
-cd frontend
-npx expo start
+npm start
 ```
+
+The server starts on `http://0.0.0.0:PORT` and logs the active environment and CORS origin.
 
 ---
 
-## 📡 REST API Documentation
+## 7. Frontend Setup
 
-### `GET /api/health`
+### Install dependencies
 
-Returns server status.
+```bash
+cd frontend
+npm install
+```
 
-**Response:**
+### Backend URL configuration
+
+The frontend reads the backend URL from `app.json → expo.extra.BACKEND_URL`:
+
+```json
+"extra": {
+  "BACKEND_URL": "https://realtime-chat-app-jhnx.onrender.com"
+}
+```
+
+`frontend/constants/config.ts` resolves this value via `expo-constants` and uses it for both REST API calls (Axios) and the Socket.io connection. A local development fallback URL is defined in `config.ts` for development without the deployed backend.
+
+### Start the development server
+
+```bash
+npx expo start --clear
+```
+
+Scan the QR code in the **Expo Go** app on your Android or iOS device. Expo Go loads the local Metro bundle — no build step required.
+
+---
+
+## 8. REST API Documentation
+
+All endpoints are prefixed with `/api`. The server is mounted at the production URL:
+`https://realtime-chat-app-jhnx.onrender.com`
+
+---
+
+### GET /api/health
+
+**Purpose:** Verify that the server is reachable and running.
+
+**Response — 200 OK:**
 ```json
 {
   "status": "OK",
@@ -240,23 +277,24 @@ Returns server status.
 
 ---
 
-### `GET /api/messages`
+### GET /api/messages
 
-Fetches all chat history sorted chronologically (oldest first).
+**Purpose:** Fetch the full chat history, sorted chronologically (oldest message first).
 
-**Response:**
+**Response — 200 OK:**
 ```json
 {
   "success": true,
   "messages": [
     {
-      "_id": "665f...",
-      "username": "Sujan",
+      "_id": "6abaaeea6b10f31b95a561bd",
+      "username": "Alice",
       "text": "Hello!",
       "delivered": true,
-      "read": false,
-      "createdAt": "2026-09-28T12:30:00.000Z",
-      "updatedAt": "2026-09-28T12:30:00.000Z"
+      "read": true,
+      "createdAt": "2026-09-28T18:16:10.691Z",
+      "updatedAt": "2026-09-28T18:16:10.691Z",
+      "__v": 0
     }
   ]
 }
@@ -264,163 +302,238 @@ Fetches all chat history sorted chronologically (oldest first).
 
 ---
 
-### `POST /api/messages`
+### POST /api/messages
 
-Creates a new message (REST fallback — real-time uses Socket.io).
+**Purpose:** Create and persist a new message via REST. (In normal app operation, messages are sent via Socket.io. This endpoint is available for direct API access and fallback use.)
 
 **Request body:**
 ```json
 {
   "username": "Sujan",
-  "text": "Hello!"
+  "text": "Hello"
 }
 ```
 
-**Response:**
+**Validation:**
+- `username` — required, trimmed, maximum **50 characters**
+- `text` — required, trimmed, non-empty, maximum **500 characters**
+
+**Response — 201 Created:**
 ```json
 {
   "success": true,
   "message": {
-    "_id": "665f...",
+    "_id": "6abb4baa4c95620dda6b5c1b",
     "username": "Sujan",
-    "text": "Hello!",
+    "text": "Hello",
     "delivered": false,
     "read": false,
-    "createdAt": "2026-09-28T12:30:00.000Z"
+    "createdAt": "2026-09-29T05:24:58.401Z",
+    "updatedAt": "2026-09-29T05:24:58.401Z",
+    "__v": 0
   }
 }
 ```
 
-**Validation errors (400):**
+**Response — 400 Bad Request** (validation failure):
 ```json
 {
   "success": false,
-  "message": "Message text is required and cannot be empty"
+  "message": "Username is required"
 }
 ```
 
 ---
 
-## 🔌 Socket.io Events
+## 9. Socket.io Events
+
+The socket server supports both `websocket` and `polling` transports. The client attempts WebSocket first and falls back to polling.
+
+---
 
 ### Client → Server
 
-| Event | Payload | Description |
+| Event | Payload | Purpose |
 |---|---|---|
-| `userJoin` | `username: string` | Register user after connecting |
-| `sendMessage` | `{ username, text }` | Send a new message |
-| `typing` | `username: string` | Notify others user is typing |
-| `stopTyping` | `username: string` | Notify others user stopped typing |
-| `messageRead` | `{ messageId, username }` | Mark message as read |
+| `userJoin` | `username: string` | Register the user after connecting. Triggers join notification and online count broadcast. |
+| `sendMessage` | `{ username: string, text: string }` | Send a new message. Validated, saved to MongoDB, then broadcast to all clients. |
+| `typing` | `username: string` | Notify other users that this user is typing. |
+| `stopTyping` | `username: string` | Notify other users that this user stopped typing. |
+| `messageRead` | `{ messageId: string, username: string }` | Mark a message as read. Updates MongoDB and broadcasts the read receipt. |
+
+---
 
 ### Server → Client
 
-| Event | Payload | Description |
+| Event | Payload | Purpose |
 |---|---|---|
-| `newMessage` | `Message` object | New message for all clients |
-| `typing` | `{ username }` | Another user is typing |
-| `stopTyping` | `{ username }` | User stopped typing |
-| `userJoined` | `{ username, onlineCount }` | A user connected |
-| `userLeft` | `{ username, onlineCount }` | A user disconnected |
-| `onlineCount` | `{ count }` | Current online user count |
-| `messageRead` | `{ messageId, username }` | Message was read |
-| `messageError` | `{ message }` | Error occurred sending message |
+| `newMessage` | Full `Message` object (see [Section 10](#10-database)) | Broadcast to **all** connected clients when a message is saved successfully. |
+| `userJoined` | `{ username: string, onlineCount: number }` | Sent to all **other** clients when a user joins. |
+| `userLeft` | `{ username: string, onlineCount: number }` | Broadcast when a user disconnects. |
+| `onlineCount` | `{ count: number }` | Broadcast to all clients whenever the online count changes. |
+| `typing` | `{ username: string }` | Forwarded to all other clients when a user is typing. |
+| `stopTyping` | `{ username: string }` | Forwarded to all other clients when a user stops typing. |
+| `messageRead` | `{ messageId: string, username: string }` | Broadcast to all clients when a message is marked as read. |
+| `messageError` | `{ message: string }` | Sent to the **sender only** if their message failed validation or could not be saved. |
 
 ---
 
-## 🏗️ Architecture
+## 10. Database
 
-### REST Flow (message history)
+**Database:** MongoDB Atlas (cloud-hosted)
+**Collection:** `messages`
+**ODM:** Mongoose
 
-```
-React Native App
-      ↓ GET /api/messages (Axios)
-Express REST API
-      ↓ query
-MongoDB (Mongoose)
-      ↑ messages[]
-React Native renders history
-```
+### Message Schema
 
-### Real-Time Flow (live messaging)
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `_id` | ObjectId | Auto | — | Unique message identifier (MongoDB) |
+| `username` | String | Yes | — | Name of the user who sent the message (max 50 chars) |
+| `text` | String | Yes | — | Message content (max 500 chars, cannot be blank) |
+| `delivered` | Boolean | No | `false` | Set to `true` by the Socket.io handler when the message is broadcast |
+| `read` | Boolean | No | `false` | Set to `true` when the `messageRead` socket event is received |
+| `createdAt` | Date | Auto | — | Timestamp when the message was created (Mongoose `timestamps`) |
+| `updatedAt` | Date | Auto | — | Timestamp of the last update (Mongoose `timestamps`) |
+| `__v` | Number | Auto | — | Mongoose internal version key |
 
-```
-User types message → presses Send
-      ↓
-Socket.io emit: sendMessage
-      ↓
-Node.js Socket handler
-      ↓ validates + saves
-MongoDB
-      ↓ savedMessage
-Socket.io broadcast: newMessage → ALL clients
-      ↓
-Every connected client receives & renders instantly
+Messages are stored with `timestamps: true` and queried with `.sort({ createdAt: 1 })` to return history in chronological order.
+
+---
+
+## 11. Error Handling and Validation
+
+### Server-side (REST API)
+
+- **Missing / empty `username`** → `400 Bad Request`
+- **Missing / empty `text`** → `400 Bad Request`
+- **Mongoose `ValidationError`** (e.g. max length exceeded) → `400 Bad Request` with the validation messages joined into a single string
+- **Mongoose `CastError`** (invalid ObjectId) → `400 Bad Request` — `"Invalid ID format"`
+- **Mongoose duplicate key (code 11000)** → `400 Bad Request` — `"Duplicate field value"`
+- **Unhandled errors** → `500 Internal Server Error`
+- **Unknown routes** → `404 Not Found` — `"Route not found"`
+
+All error responses follow the shape: `{ "success": false, "message": "..." }`
+
+### Server-side (Socket.io)
+
+- Empty `username` on `userJoin` → silently ignored
+- Empty / blank `text` on `sendMessage` → `messageError` event sent to sender
+- `text` exceeding 500 characters → `messageError` event sent to sender
+- MongoDB save failure → `messageError` event sent to sender
+
+### Client-side (Frontend)
+
+- Username under 2 characters → inline error displayed before navigation
+- Username over 50 characters → inline error displayed (enforced by `maxLength` + validation)
+- Network errors (ECONNREFUSED, ERR_NETWORK, no response) → user-friendly error messages via Axios response interceptor
+- Socket connection errors → logged to console; reconnection attempted automatically (up to 10 times, 1 second delay)
+
+---
+
+## 12. Deployment
+
+### Backend — Render
+
+The backend is deployed as a **Node.js Web Service** on [Render](https://render.com) using the `render.yaml` configuration file at the repository root.
+
+| Setting | Value |
+|---|---|
+| **Production URL** | https://realtime-chat-app-jhnx.onrender.com |
+| **Root directory** | `backend/` |
+| **Build command** | `npm install --omit=dev` |
+| **Start command** | `npm start` |
+| **Health check** | `GET /api/health` |
+| **Auto-deploy** | Enabled (triggers on push to connected branch) |
+| **WebSocket support** | Native on Render — no extra configuration required |
+
+Environment variables (`MONGO_URI`, `CLIENT_URL`) are configured as secrets in the Render dashboard and are **not** stored in the repository. `PORT` is injected automatically by Render.
+
+### Frontend — Expo Go (Development)
+
+The React Native frontend runs via **Expo Go** on physical Android and iOS devices during development. It is not deployed as a standalone web application. The production backend URL is configured in `frontend/app.json`:
+
+```json
+"extra": {
+  "BACKEND_URL": "https://realtime-chat-app-jhnx.onrender.com"
+}
 ```
 
 ---
 
-## 💡 Design Decisions
+## 13. Testing
+
+All tests below were performed manually against the production Render backend.
+
+| Test | Method | Result |
+|---|---|---|
+| `GET /api/health` responds 200 | HTTP | ✅ PASS |
+| `GET /api/messages` returns chat history | HTTP | ✅ PASS |
+| `POST /api/messages` creates a message (201) | HTTP | ✅ PASS |
+| POSTed message persists in MongoDB | HTTP (round-trip GET) | ✅ PASS |
+| `POST /api/messages` with empty `username` → 400 | HTTP | ✅ PASS |
+| `POST /api/messages` with empty `text` → 400 | HTTP | ✅ PASS |
+| Socket.io connects and registers user | Two-device test | ✅ PASS |
+| Real-time message delivery across two devices | Two-device test | ✅ PASS |
+| Chat history loads on screen entry | Expo Go | ✅ PASS |
+| Messages visible after reopening the app | Expo Go | ✅ PASS |
+| Expo Go loads local Metro bundle without update errors | Expo Go | ✅ PASS |
+
+> There are no automated tests (unit or integration). All verification was done manually.
+
+---
+
+## 14. Design Decisions
 
 **Why Socket.io?**
-Socket.io provides reliable WebSocket communication with automatic fallback to HTTP long-polling. This guarantees instant message delivery without polling. It also supports rooms, acknowledgements, and reconnection out of the box.
+Socket.io provides a reliable, bi-directional event-based communication layer over WebSockets with automatic polling fallback. It handles reconnection, room broadcasting, and cross-platform compatibility without additional infrastructure.
+
+**Why REST APIs alongside Socket.io?**
+Socket.io is stateful — it requires an active connection. The REST API provides a stateless, universally compatible interface for fetching chat history on screen load and for direct API access or debugging. Both layers write to the same MongoDB collection, keeping the data source unified.
 
 **Why MongoDB?**
-MongoDB's flexible document model is well-suited for chat messages. Messages are independent documents that don't require complex relational joins. Timestamps and schema validation are handled cleanly with Mongoose.
+MongoDB's document model maps naturally to message objects (flexible fields, embedded objects). MongoDB Atlas provides a fully managed cloud database with no self-hosting overhead, which suits a project deployed on Render's free tier.
 
-**Why separated frontend/backend?**
-Keeping them separate enables independent scaling, deployment, and development. The backend can be deployed to any Node.js host, while the frontend can be built into an APK for Android distribution.
+**Why a frontend / backend monorepo split?**
+Separating the frontend and backend into distinct directories within the same repository allows them to be developed, versioned, and deployed independently. The backend can be redeployed without touching the frontend, and vice versa.
 
-**Duplicate message prevention:**
-Messages are sent exclusively via Socket.io `sendMessage`. The backend saves to MongoDB and broadcasts `newMessage` to all clients. The REST `POST /api/messages` endpoint exists for API completeness but is **not used** in the real-time flow, preventing duplicates.
-
----
-
-## 🧾 Assumptions
-
-- **No real authentication**: Username entry is a session-only dummy auth. There is no password, JWT, or user account.
-- **Global chatroom**: All connected users share a single chat room. Private/group chats are not implemented.
-- **No message pagination**: All messages are loaded at once. For large datasets, pagination should be added.
+**Why environment variables?**
+Credentials (MongoDB URI) and environment-specific configuration (CORS origin, port) are kept out of source code via `.env` files and platform secrets (Render dashboard). The `.env.example` file documents variable names without exposing values.
 
 ---
 
-## 🔧 Troubleshooting
+## 15. Environment Variables
 
-| Problem | Solution |
+These variables are required by the **backend**. Copy `backend/.env.example` to `backend/.env` and fill in your values. **Never commit `.env` to version control.**
+
+| Variable | Purpose |
 |---|---|
-| Backend not starting | Check `PORT` in `.env` and that port 5000 is free |
-| MongoDB connection fails | Verify `MONGO_URI` in `.env`. Check Atlas Network Access allows your IP |
-| Socket not connecting | Ensure backend is running on port 5000 |
-| Android Emulator can't reach backend | Change `localhost` to `10.0.2.2` in `constants/config.ts` |
-| Physical device can't reach backend | Use your PC's local IP (e.g. `192.168.1.x`) in `constants/config.ts` |
-| Messages not persisting | Verify MongoDB write access. Check backend logs for errors |
-| Expo not starting | Run `npm install` in the `frontend` folder |
+| `PORT` | The port the Express server listens on. Render injects this automatically in production — set to `5000` locally. |
+| `MONGO_URI` | MongoDB Atlas connection string. Contains your cluster hostname, username, password, and database name. Set as a secret in the Render dashboard. |
+| `CLIENT_URL` | Allowed CORS origin(s). Use `*` for mobile-only deployments. Use a comma-separated list for multiple web origins. Set as a secret in the Render dashboard. |
+| `NODE_ENV` | Runtime environment. Set to `development` locally and `production` on Render. |
 
 ---
 
-## 🔮 Future Improvements
+## 16. Future Improvements
 
-- Real authentication with JWT + bcrypt
-- Private one-to-one messaging
-- Group chat rooms
-- Push notifications (Expo Notifications)
-- Image / file sharing
-- Message reactions (emoji)
-- Message search
-- Message pagination / infinite scroll
-- User avatars / profile pictures
-- Dark/light theme toggle
-- E2E encryption
+The following are not currently implemented and represent potential future enhancements:
+
+- **User authentication** — persistent accounts with passwords or OAuth (Google, GitHub)
+- **Private one-to-one conversations** — dedicated chat rooms between two users
+- **Push notifications** — notify users of new messages when the app is in the background
+- **Image and file sharing** — send media attachments within the chat
+- **More detailed read receipts** — per-user read tracking (e.g. "Seen by Alice, Bob")
+- **Message reactions** — emoji reactions on individual messages
+- **Message deletion or editing** — allow users to remove or modify sent messages
+- **Pagination** — load older messages on demand rather than fetching the full history
+- **Production monitoring** — integrate an observability tool (e.g. Sentry, Datadog)
+- **Automated testing** — unit tests (Jest), integration tests, and end-to-end tests
 
 ---
 
-## 👨‍💻 Two-Client Test
+## 17. Author
 
-1. Start backend: `cd backend && npm run dev`
-2. Start frontend: `cd frontend && npx expo start`
-3. Open **Expo Go** on two devices (or one device + one emulator)
-4. On **Device 1**: Enter username `Sujan` → Join Chat
-5. On **Device 2**: Enter username `Rahul` → Join Chat
-6. **Sujan** types `"Hello Rahul"` → **Rahul** receives it instantly
-7. **Rahul** replies `"Hi Sujan"` → **Sujan** receives it instantly
-8. Close both apps and reopen — all messages are still there ✓
+**Sujan S S**
+
+GitHub: [https://github.com/sujansssujanss7-suj/Realtime-Chat-App](https://github.com/sujansssujanss7-suj/Realtime-Chat-App)
