@@ -30,7 +30,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "BACKEND_URL": "https://YOUR-ACTUAL-RENDER-URL.onrender.com"
+      "BACKEND_URL": "https://realtime-chat-app-jhnx.onrender.com"
     }
   }
 }
