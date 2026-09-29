@@ -3,6 +3,10 @@
     "name": "Real-Time Chat",
     "slug": "realtime-chat-app",
     "version": "1.0.0",
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "NEVER"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
